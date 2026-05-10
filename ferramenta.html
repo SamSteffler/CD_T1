@@ -201,19 +201,16 @@
 
 <div class="container">
     <h1>Visualizador de Codificações de Linha</h1>
-
     <div class="input-section">
         <div class="bit-row">
             <span>Entrada:</span>
             <input type="text" id="bitSequence" placeholder="Ex: 10011010">
         </div>
     </div>
-
     <div class="controls-section">
         <h2 class="sr-only">Esquemas de codificação disponíveis</h2>
         <div class="enc-tabs" id="tabs"></div>
     </div>
-
     <div class="content-section">
         <div id="canvases"></div>
     </div>
@@ -335,30 +332,6 @@
             }
         },
         {
-            id: '4b5b', name: '4B/5B',
-            props: { sync: 'Boa', dc: 'Parcial', bw: '1,25 * taxa', erro: 'Parcial' },
-            syncQ: 'good', dcQ: 'mid', bwQ: 'mid', erroQ: 'mid',
-            draw(ctx, bits, W, H, bw, hi, lo, mid, tc) {
-                const map = { '0000': '11110', '0001': '01001', '0010': '10100', '0011': '10101', '0100': '01010', '0101': '01011', '0110': '01110', '0111': '01111', '1000': '10010', '1001': '10011', '1010': '10110', '1011': '10111', '1100': '11010', '1101': '11011', '1110': '11100', '1111': '11101' };
-                let encoded = [];
-                for (let i = 0; i < bits.length; i += 4) {
-                    const nibble = bits.slice(i, i + 4).join('');
-                    const padded = nibble.padEnd(4, '0');
-                    encoded = encoded.concat((map[padded] || '11110').split('').map(Number));
-                }
-                const ebw = W / encoded.length;
-                let cur = lo;
-                ctx.beginPath();
-                encoded.forEach((b, i) => {
-                    const x = i * ebw;
-                    if (b === 1) cur = cur === hi ? lo : hi;
-                    if (i === 0) ctx.moveTo(x, cur); else ctx.lineTo(x, cur);
-                    ctx.lineTo(x + ebw, cur);
-                });
-                ctx.stroke();
-            }
-        },
-        {
             id: 'mlt3', name: 'MLT-3',
             props: { sync: 'Excelente', dc: 'Não', bw: '1 * taxa', erro: 'Não' },
             syncQ: 'good', dcQ: 'good', bwQ: 'good', erroQ: 'bad',
@@ -386,10 +359,10 @@
             props: { sync: 'Parcial', dc: 'Não', bw: '0,5 * taxa', erro: 'Não' },
             syncQ: 'mid', dcQ: 'good', bwQ: 'good', erroQ: 'bad',
             draw(ctx, bits, W, H, bw, hi, lo, mid, tc) {
-                const map = { '00': lo, '01': (mid + lo) / 2, '10': hi, '11': (mid + hi) / 2 };
+                const map = { '00': lo, '01': lo + (hi - lo) / 3, '10': hi, '11': lo + (hi - lo) / 3 * 2 };
                 ctx.beginPath();
                 for (let i = 0; i < bits.length; i += 2) {
-                    const pair = bits.slice(i, i + 2).join('') || '00';
+                    const pair = bits.slice(i, i + 2).join('').padEnd(2, '0');
                     const y = map[pair] || lo;
                     const x = (i / 2) * bw;
                     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
@@ -408,24 +381,26 @@
             props: { sync: 'Parcial', dc: 'Não', bw: '2 * taxa', erro: 'Sim (inversão)' },
             syncQ: 'mid', dcQ: 'good', bwQ: 'good', erroQ: 'good',
             draw(ctx, bits, W, H, bw, hi, lo, mid, tc) {
-                let lastLevel = lo;
-                let lastOneLevel = lo;
+                let lastLevel = null;
+                let lastOneLevel = null;
                 ctx.beginPath();
                 bits.forEach((b, i) => {
                     const x = i * bw;
                     const mid_x = x + bw / 2;
-                    
+
                     if (b === 1) {
                         // bit um: oposto ao ultimo bit 1
                         const nextLevel = lastOneLevel === hi ? lo : hi;
-                        if (i === 0) ctx.moveTo(x, lastOneLevel); else ctx.lineTo(x, lastLevel);
+                        if (lastOneLevel === null) ctx.moveTo(x, lastLevel === null ? hi : lastLevel); else ctx.lineTo(x, lastLevel);
                         ctx.lineTo(x, nextLevel);
                         ctx.lineTo(x + bw, nextLevel);
                         lastOneLevel = nextLevel;
                         lastLevel = nextLevel;
                     } else {
                         // bit zero: transicao obrigatoria lo -> hi
-                        if (lastLevel === hi) {ctx.lineTo(x, lo);}
+                        if (lastLevel === null) { ctx.moveTo(x, lo); }
+                        else if (lastLevel === hi) { ctx.lineTo(x, lo); }
+                        if (lastOneLevel === null) ctx.moveTo(x, lo);
                         ctx.lineTo(mid_x, lo);
                         ctx.lineTo(mid_x, hi);
                         ctx.lineTo(x + bw, hi);
@@ -473,79 +448,83 @@
         });
     }
 
-    function calculateTransitions(schemeId, bits) {
+    function contaTransicoes(schemeId, bits) {
         if (bits.length === 0) return 0;
         const hi = 38; const lo = 138; const mid = (hi + lo) / 2;
         const s = SCHEMES.find(x => x.id === schemeId);
         let levels = [];
-        let transitions = 0;
-        
+        let transicoes = 0;
+
         if (schemeId === 'nrzl') {
+            // conta quando bit muda de estado de 1 -> 0 ou 0 -> 1
             let lastLevel = null;
             bits.forEach(b => {
                 const level = b ? hi : lo;
-                if (lastLevel !== null && lastLevel !== level) transitions++;
+                if (lastLevel !== null && lastLevel !== level) transicoes++;
                 lastLevel = level;
             });
         } else if (schemeId === 'nrzi') {
+            // conta quando bit 1 aparece e se tem valor diferente do ultimo
             let cur = lo;
             let lastLevel = null;
             bits.forEach(b => {
                 if (b === 1) cur = cur === hi ? lo : hi;
-                if (lastLevel !== null && lastLevel !== cur) transitions++;
+                if (lastLevel !== null && lastLevel !== cur) transicoes++;
                 lastLevel = cur;
             });
         } else if (schemeId === 'man') {
-            transitions = bits.length;
+            // contar transicoes duplas se o bit anterior for igual ao atual (1 -> 1 ou 0 -> 0)
+            let lastLevel = null;
+            bits.forEach(b => {
+                const level = b ? hi : lo;
+                if (lastLevel !== null) {
+                    if (lastLevel === level) transicoes += 2; // transicao dupla
+                    else transicoes++; // transicao simples
+                } else transicoes++;
+                lastLevel = level;
+            });
         } else if (schemeId === 'dman') {
-            let cur = hi;
-            transitions = bits.filter((b, i) => {
-                if (b === 0) { cur = cur === hi ? lo : hi; return true; }
-                return false;
-            }).length;
-            transitions += bits.length;
+            // conta quantidade de trasicoes = numero de bits + numero de bits zero (transicao obrigatoria no inicio do bit)
+            let lastLevel = null;
+            bits.forEach(b => {
+                const level = b ? hi : lo;
+                if (level === lo) {
+                    if (lastLevel !== null) transicoes++; // muda para estado alto
+                    transicoes++; // transicao obrigatoria  
+                } else transicoes++;
+                lastLevel = level;
+            });
         } else if (schemeId === 'ami') {
+            // conta uma transicao toda vez que nivel (tanto 1 ou -1 -> 0 ou 0 -> 1 ou -1) muda
             let pol = 1;
             let lastLevel = null;
             bits.forEach(b => {
                 let y;
                 if (b === 0) { y = mid; }
                 else { y = pol === 1 ? hi : lo; pol *= -1; }
-                if (lastLevel !== null && lastLevel !== y) transitions++;
+                if (lastLevel !== null && lastLevel !== y) transicoes++;
                 lastLevel = y;
             });
-        } else if (schemeId === '4b5b') {
-            const map = { '0000': '11110', '0001': '01001', '0010': '10100', '0011': '10101', '0100': '01010', '0101': '01011', '0110': '01110', '0111': '01111', '1000': '10010', '1001': '10011', '1010': '10110', '1011': '10111', '1100': '11010', '1101': '11011', '1110': '11100', '1111': '11101' };
-            let encoded = [];
-            for (let i = 0; i < bits.length; i += 4) {
-                const nibble = bits.slice(i, i + 4).join('');
-                const padded = nibble.padEnd(4, '0');
-                encoded = encoded.concat((map[padded] || '11110').split('').map(Number));
-            }
-            let cur = lo;
-            let lastLevel = null;
-            encoded.forEach(b => {
-                if (b === 1) cur = cur === hi ? lo : hi;
-                if (lastLevel !== null && lastLevel !== cur) transitions++;
-                lastLevel = cur;
-            });
         } else if (schemeId === 'mlt3') {
+            // compara mudanca de nivel logico (que so acontece quando b == 1)
             const levels = [hi, mid, lo, mid];
             let levelIdx = 0;
             let lastLevel = null;
             bits.forEach(b => {
                 if (b === 1) levelIdx = (levelIdx + 1) % 4;
                 const level = levels[levelIdx];
-                if (lastLevel !== null && lastLevel !== level) transitions++;
+                if (lastLevel !== null && lastLevel !== level) transicoes++;
                 lastLevel = level;
             });
         } else if (schemeId === '2b1q') {
-            const map = { '00': lo, '01': (mid + lo) / 2, '10': hi, '11': (mid + hi) / 2 };
+            // compara niveis par a par usando os niveis reais da codificacao 2B1Q
+            const tensoes = { '00': -3, '01': -1, '10': 3, '11': 1 };
+            const voltageToY = v => mid - (v / 3) * (lo - mid);
             let lastLevel = null;
             for (let i = 0; i < bits.length; i += 2) {
-                const pair = bits.slice(i, i + 2).join('') || '00';
-                const level = map[pair] || lo;
-                if (lastLevel !== null && lastLevel !== level) transitions++;
+                const pair = bits.slice(i, i + 2).join('').padEnd(2, '0');
+                const level = voltageToY(tensoes[pair] ?? -3);
+                if (lastLevel !== null && lastLevel !== level) transicoes++;
                 lastLevel = level;
             }
         } else if (schemeId === 'cmi') {
@@ -553,15 +532,21 @@
             // uma transicao: bit 1 depois de outro bit 1 ou bit zero depois de bit 1 low
             // duas transicoes: bit zero depois de bit zero ou bit zero depois de bit 1 high
             let lastLevel = lo;
-            let lastOneLevel = lo;
+            let lastOneLevel = null;
             const samples = [];
             for (let i = 0; i < bits.length; i++) {
                 const b = bits[i];
                 if (b === 1) {
                     const nextLevel = lastOneLevel === hi ? lo : hi;
-                    samples.push(lastLevel);
-                    samples.push(nextLevel);
-                    samples.push(nextLevel);
+                    if (lastOneLevel === null) {
+                        samples.push(nextLevel);
+                        samples.push(nextLevel);
+                        samples.push(nextLevel);
+                    } else {
+                        samples.push(lastLevel);
+                        samples.push(nextLevel);
+                        samples.push(nextLevel);
+                    }
                     lastOneLevel = nextLevel;
                     lastLevel = nextLevel;
                 } else {
@@ -573,70 +558,75 @@
             }
             let last = null;
             // conta string formada pelas transicoes
-            samples.forEach(s => { if (last !== null && last !== s) transitions++; last = s; });
+            samples.forEach(s => { if (last !== null && last !== s) transicoes++; last = s; });
         } else if (schemeId === 'psternary') {
+            // mesma logica de ami com bit de transicao invertido
             let pol = 1;
             let lastLevel = null;
             bits.forEach(b => {
                 let y;
                 if (b === 0) { y = pol === 1 ? hi : lo; pol *= -1; }
                 else { y = mid; }
-                if (lastLevel !== null && lastLevel !== y) transitions++;
+                if (lastLevel !== null && lastLevel !== y) transicoes++;
                 lastLevel = y;
             });
         }
-        return transitions;
+        return transicoes;
     }
 
-    function calculateAverageLevel(schemeId, bits) {
+    // regras de cada protocolo para calcular a tensao dc media
+    function calculaDCmedio(schemeId, bits) {
         if (bits.length === 0) return 0;
         const hi = 38; const lo = 138; const mid = (hi + lo) / 2;
         let sum = 0;
         let count = 0;
-        
+
         if (schemeId === 'nrzl') {
             bits.forEach(b => { sum += b ? hi : lo; count++; });
         } else if (schemeId === 'nrzi') {
             let cur = lo;
-            bits.forEach(b => { if (b === 1) cur = cur === hi ? lo : hi; sum += cur; count++; });
+            bits.forEach(b => {
+                if (b === 1) cur = cur === hi ? lo : hi;
+                sum += cur; count++;
+            });
         } else if (schemeId === 'man') {
             bits.forEach(() => { sum += (hi + lo) / 2; count++; });
         } else if (schemeId === 'dman') {
             let cur = hi;
-            bits.forEach((b) => { if (b === 0) cur = cur === hi ? lo : hi; const nxt = cur === hi ? lo : hi; sum += (cur + nxt) / 2; count++; });
+            bits.forEach((b) => {
+                if (b === 0) cur = cur === hi ? lo : hi;
+                const nxt = cur === hi ? lo : hi;
+                sum += (cur + nxt) / 2; 
+                count++;
+            });
         } else if (schemeId === 'ami') {
             let pol = 1;
-            bits.forEach(b => { if (b === 0) sum += mid; else { sum += pol === 1 ? hi : lo; pol *= -1; } count++; });
-        } else if (schemeId === '4b5b') {
-            const map = { '0000': '11110', '0001': '01001', '0010': '10100', '0011': '10101', '0100': '01010', '0101': '01011', '0110': '01110', '0111': '01111', '1000': '10010', '1001': '10011', '1010': '10110', '1011': '10111', '1100': '11010', '1101': '11011', '1110': '11100', '1111': '11101' };
-            let encoded = [];
-            for (let i = 0; i < bits.length; i += 4) {
-                const nibble = bits.slice(i, i + 4).join('');
-                const padded = nibble.padEnd(4, '0');
-                encoded = encoded.concat((map[padded] || '11110').split('').map(Number));
-            }
-            let cur = lo;
-            encoded.forEach(b => { if (b === 1) cur = cur === hi ? lo : hi; sum += cur; count++; });
+            bits.forEach(b => {
+                if (b === 0) sum += mid;
+                else {
+                    sum += pol === 1 ? hi : lo;
+                    pol *= -1;
+                }
+                count++;
+            });
         } else if (schemeId === 'mlt3') {
             const levels = [hi, mid, lo, mid];
             let levelIdx = 0;
             bits.forEach(b => { if (b === 1) levelIdx = (levelIdx + 1) % 4; sum += levels[levelIdx]; count++; });
         } else if (schemeId === '2b1q') {
-            const map = { '00': lo, '01': (mid + lo) / 2, '10': (mid + hi) / 2, '11': hi };
+            const tensoes = { '00': -3, '01': -1, '10': 3, '11': 1 };
             for (let i = 0; i < bits.length; i += 2) {
-                const pair = bits.slice(i, i + 2).join('') || '00';
-                sum += map[pair] || lo;
+                const pair = bits.slice(i, i + 2).join('').padEnd(2, '0');
+                sum += tensoes[pair] ?? -3;
                 count++;
             }
         } else if (schemeId === 'cmi') {
             let currentLevel = lo;
             bits.forEach(b => {
                 if (b === 1) {
-                    // Bit 1: full bit at one level
                     currentLevel = currentLevel === hi ? lo : hi;
                     sum += currentLevel;
                 } else {
-                    // Bit 0: mid-bit transition, average of current and opposite
                     const oppositeLevel = currentLevel === hi ? lo : hi;
                     sum += (currentLevel + oppositeLevel) / 2;
                 }
@@ -651,9 +641,13 @@
                 sum += y; count++;
             });
         }
+        if (schemeId === '2b1q') {
+            return count > 0 ? (sum / count).toFixed(2) : 0;
+        }
         return count > 0 ? ((sum / count - lo) / (hi - lo) * 2 - 1).toFixed(2) : 0;
     }
 
+    // funcao para desenho de cada formato de onda
     function draw() {
         const container = document.getElementById('canvases');
         container.innerHTML = '';
@@ -662,89 +656,79 @@
         const bc = getComputedStyle(document.documentElement).getPropertyValue('--color-border-tertiary').trim();
         const labels = { sync: 'Sincronização', dc: 'Componente DC', bw: 'Banda consumida', erro: 'Detecção de erro', transitions: 'Transições', avgLevel: 'Nível Médio' };
         const qmapKey = { sync: 'syncQ', dc: 'dcQ', bw: 'bwQ', erro: 'erroQ' };
-        
+
+        // cria cards para cada esquema marcado como ativo na lista de ativos
         activeSchemes.forEach(schemeId => {
             const s = SCHEMES.find(x => x.id === schemeId);
             const item = document.createElement('div');
             item.className = 'canvas-item';
-            
             const wrapper = document.createElement('div');
             wrapper.className = 'canvas-wrapper';
-            
+            // grafico de sinal
             const label = document.createElement('div');
             label.className = 'canvas-label';
             label.textContent = s.name;
             wrapper.appendChild(label);
-            
             const canvas = document.createElement('canvas');
             canvas.height = 190;
             wrapper.appendChild(canvas);
             item.appendChild(wrapper);
-            
-            // Create properties panel
+            // painel de propriedades
             const propsPanel = document.createElement('div');
             propsPanel.className = 'canvas-properties';
-            
+
             const propsArray = ['sync', 'dc', 'bw', 'erro', 'transitions', 'avgLevel'];
             propsArray.forEach(k => {
-                const d = document.createElement('div'); 
+                const d = document.createElement('div');
                 d.className = 'prop';
-                const lbl = document.createElement('div'); 
-                lbl.className = 'prop-label'; 
+                const lbl = document.createElement('div');
+                lbl.className = 'prop-label';
                 lbl.textContent = labels[k];
                 const val = document.createElement('div');
-                
+
                 let value = '';
                 if (k === 'transitions') {
-                    value = calculateTransitions(schemeId, bits).toString();
+                    value = contaTransicoes(schemeId, bits).toString();
                 } else if (k === 'avgLevel') {
-                    value = calculateAverageLevel(schemeId, bits).toString();
+                    value = calculaDCmedio(schemeId, bits).toString();
+                    if (schemeId === '2b1q') value += ' V';
                 } else {
                     val.className = 'prop-val' + (qmapKey[k] ? ' ' + s[qmapKey[k]] : '');
                     value = s.props[k];
                 }
                 val.textContent = value;
-                d.appendChild(lbl); 
-                d.appendChild(val); 
+                d.appendChild(lbl);
+                d.appendChild(val);
                 propsPanel.appendChild(d);
             });
             item.appendChild(propsPanel);
             container.appendChild(item);
-            
+
             const dpr = window.devicePixelRatio || 1;
             const W = canvas.offsetWidth;
             const H = Math.max(190, propsPanel.offsetHeight);
             canvas.width = W * dpr; canvas.height = H * dpr;
-            const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
             ctx.clearRect(0, 0, W, H);
             const hi = Math.max(30, H * 0.2);
             const lo = Math.min(H - 30, H * 0.75);
             const mid = (hi + lo) / 2;
-            
+
             let bw = W / bits.length;
             let gridBits = bits;
-            
-            // For 4B/5B, calculate encoded bits for proper grid spacing
-            if (s.id === '4b5b') {
-                const map = { '0000': '11110', '0001': '01001', '0010': '10100', '0011': '10101', '0100': '01010', '0101': '01011', '0110': '01110', '0111': '01111', '1000': '10010', '1001': '10011', '1010': '10110', '1011': '10111', '1100': '11010', '1101': '11011', '1110': '11100', '1111': '11101' };
-                let encoded = [];
-                for (let i = 0; i < bits.length; i += 4) {
-                    const nibble = bits.slice(i, i + 4).join('');
-                    const padded = nibble.padEnd(4, '0');
-                    encoded = encoded.concat((map[padded] || '11110').split('').map(Number));
-                }
-                gridBits = encoded;
-            } else if (s.id === '2b1q') {
-                // For 2B1Q, group bits into pairs (symbols)
+
+            if (s.id === '2b1q') {
+                //agrupar em pares
                 let symbols = [];
                 for (let i = 0; i < bits.length; i += 2) {
-                    const pair = bits.slice(i, i + 2).join('') || '00';
+                    const pair = bits.slice(i, i + 2).join('').padEnd(2, '0');
                     symbols.push(pair);
                 }
                 gridBits = symbols;
                 bw = W / symbols.length;
             }
-            
+
             const gridBw = W / gridBits.length;
             ctx.strokeStyle = bc; ctx.lineWidth = 0.5;
             gridBits.forEach((_, i) => {
@@ -753,11 +737,24 @@
             });
             ctx.fillStyle = tc; ctx.font = '12px sans-serif';
             gridBits.forEach((b, i) => ctx.fillText(b, i * gridBw + gridBw / 2 - 4, 18));
-            ctx.fillText('+V', 4, hi + 4); ctx.fillText('0', 4, mid + 4); ctx.fillText('−V', 4, lo + 4);
             ctx.strokeStyle = bc; ctx.lineWidth = 0.3; ctx.setLineDash([2, 3]);
-            [hi, lo].forEach(y => { ctx.beginPath(); ctx.moveTo(28, y); ctx.lineTo(W, y); ctx.stroke(); });
+            if (s.id === '2b1q') {
+                const voltageToY = v => mid - (v / 3) * (lo - mid);
+                [
+                    { text: '+3V', y: voltageToY(3) },
+                    { text: '+1V', y: voltageToY(1) },
+                    { text: '-1V', y: voltageToY(-1) },
+                    { text: '-3V', y: voltageToY(-3) },
+                ].forEach(({ text, y }) => {
+                    ctx.beginPath(); ctx.moveTo(28, y); ctx.lineTo(W, y); ctx.stroke();
+                    ctx.fillText(text, 4, y + 4);
+                });
+            } else {
+                ctx.fillText('+V', 4, hi + 4); ctx.fillText('0', 4, mid + 4); ctx.fillText('-V', 4, lo + 4);
+                [hi, lo].forEach(y => { ctx.beginPath(); ctx.moveTo(28, y); ctx.lineTo(W, y); ctx.stroke(); });
+            }
             ctx.setLineDash([]);
-            
+
             ctx.strokeStyle = '#1D9E75'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
             s.draw(ctx, bits, W, H, bw, hi, lo, mid, tc);
         });
