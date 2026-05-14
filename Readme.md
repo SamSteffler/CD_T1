@@ -18,7 +18,7 @@ A ferramenta contempla todos os códigos base vistos em aula, além dos três c�
 
 ##  Como Executar a Ferramenta
 
-A interface foi projetada para ser intuitiva e permitir a comparação direta entre diferentes esquemas de codificação em tempo real.
+A interface foi projetada para ser intuitiva e permitir a comparação direta entre diferentes esquemas de codificação em tempo real. Ela pode ser acessada diretamente pela [GitHub Pages](https://samsteffler.github.io/CD_T1/) do projeto.
 
 ### 1. Entrada da Sequência Binária
 No topo da página, tem o campo de Entrada. Ali você digita manualmente a sequência de bits que quer analisar. O campo possui validação e processa apenas os caracteres `0` e `1`. A atualização do gráfico ocorre em tempo real conforme a digitação.
@@ -38,3 +38,5 @@ Para cada código ativado, será renderizado um bloco contendo:
 
 ---
 *Trabalho desenvolvido para a disciplina de Comunicação de Dados - UFSM (2026).*
+
+*De autoria dos alunos Enzo Santin da Silveira, Luan Tiago Streck, Samuel Steffler e Tiago Steffler*
