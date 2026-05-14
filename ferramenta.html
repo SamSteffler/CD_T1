@@ -217,6 +217,7 @@
 </div>
 
 <script>
+    // listagem das propriedades e metodos de desenho para cada esquema
     const SCHEMES = [
         {
             id: 'nrzl', name: 'NRZ-L',
@@ -416,10 +417,12 @@
             }
         }
     ];
-
+    
+    // valores e esquema de entrada para representacao
     let bits = [1, 0, 0, 1, 1, 0, 1, 0];
     let activeSchemes = new Set(['nrzl']);
-
+    
+    //atualiza em tempo real os sinais
     function updateBitsFromSequence() {
         const seq = document.getElementById('bitSequence').value.trim();
         if (!seq) { bits = []; draw(); return; }
@@ -428,7 +431,7 @@
         bits = validBits.map(Number);
         draw();
     }
-
+    // monta a lista de esquemas disponiveis
     function buildTabs() {
         const tabs = document.getElementById('tabs');
         tabs.innerHTML = '';
@@ -447,7 +450,8 @@
             tabs.appendChild(t);
         });
     }
-
+    
+    // conta a quantidade de nmundasncas de nivel para cada esquema
     function contaTransicoes(schemeId, bits) {
         if (bits.length === 0) return 0;
         const hi = 38; const lo = 138; const mid = (hi + lo) / 2;
@@ -582,25 +586,26 @@
         let count = 0;
 
         if (schemeId === 'nrzl') {
+            // soma altura dos pixels da cada sinal apenas
             bits.forEach(b => { sum += b ? hi : lo; count++; });
         } else if (schemeId === 'nrzi') {
             let cur = lo;
+            // inverte cur se necessario e soma a altura do pixel de cur
             bits.forEach(b => {
                 if (b === 1) cur = cur === hi ? lo : hi;
                 sum += cur; count++;
             });
         } else if (schemeId === 'man') {
+            // sempre sera igual a media entre hi e lo pois meio ciclo eh hi e meio ciclo eh lo
+            // poderia ser mudado para mid
             bits.forEach(() => { sum += (hi + lo) / 2; count++; });
         } else if (schemeId === 'dman') {
             let cur = hi;
-            bits.forEach((b) => {
-                if (b === 0) cur = cur === hi ? lo : hi;
-                const nxt = cur === hi ? lo : hi;
-                sum += (cur + nxt) / 2; 
-                count++;
-            });
+            // mesma ideia de manchester normal
+            bits.forEach(() => { sum += (hi + lo) / 2; count++; });
         } else if (schemeId === 'ami') {
             let pol = 1;
+            // soma mid se for zero e hi/lo a depender da ordem do bit 1
             bits.forEach(b => {
                 if (b === 0) sum += mid;
                 else {
@@ -610,10 +615,12 @@
                 count++;
             });
         } else if (schemeId === 'mlt3') {
+            // cicla pelos niveies em levels[] a cada bit 1 lido, 0 mantem o nivel anterior
             const levels = [hi, mid, lo, mid];
             let levelIdx = 0;
             bits.forEach(b => { if (b === 1) levelIdx = (levelIdx + 1) % 4; sum += levels[levelIdx]; count++; });
         } else if (schemeId === '2b1q') {
+            // diferente pois trabalha com niveis definidos (resposta retornada diferente do resto)
             const tensoes = { '00': -3, '01': -1, '10': 3, '11': 1 };
             for (let i = 0; i < bits.length; i += 2) {
                 const pair = bits.slice(i, i + 2).join('').padEnd(2, '0');
@@ -627,13 +634,13 @@
                     currentLevel = currentLevel === hi ? lo : hi;
                     sum += currentLevel;
                 } else {
-                    const oppositeLevel = currentLevel === hi ? lo : hi;
-                    sum += (currentLevel + oppositeLevel) / 2;
+                    sum += (hi + lo) / 2;
                 }
                 count++;
             });
         } else if (schemeId === 'psternary') {
             let pol = 1;
+            // logica inversa da ami
             bits.forEach(b => {
                 let y;
                 if (b === 0) { y = pol === 1 ? hi : lo; pol *= -1; }
@@ -642,8 +649,11 @@
             });
         }
         if (schemeId === '2b1q') {
+            // media simples sem mapeamento entre -1 e 1
             return count > 0 ? (sum / count).toFixed(2) : 0;
         }
+        // media de tensao fica normalizada entre -V e +V com excecao do 2B1Q
+        // valores da soma ficarao entre 38 (+v) e -138 (-V)
         return count > 0 ? ((sum / count - lo) / (hi - lo) * 2 - 1).toFixed(2) : 0;
     }
 
@@ -676,7 +686,7 @@
             // painel de propriedades
             const propsPanel = document.createElement('div');
             propsPanel.className = 'canvas-properties';
-
+            // informacoes de cada propriedade do esquema
             const propsArray = ['sync', 'dc', 'bw', 'erro', 'transitions', 'avgLevel'];
             propsArray.forEach(k => {
                 const d = document.createElement('div');
@@ -703,7 +713,7 @@
             });
             item.appendChild(propsPanel);
             container.appendChild(item);
-
+            // configuracao do canvas
             const dpr = window.devicePixelRatio || 1;
             const W = canvas.offsetWidth;
             const H = Math.max(190, propsPanel.offsetHeight);
@@ -756,6 +766,7 @@
             ctx.setLineDash([]);
 
             ctx.strokeStyle = '#1D9E75'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+            // chama metodo de desenho para cada esquema 
             s.draw(ctx, bits, W, H, bw, hi, lo, mid, tc);
         });
     }
