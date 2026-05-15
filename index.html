@@ -334,8 +334,8 @@
         },
         {
             id: 'mlt3', name: 'MLT-3',
-            props: { sync: 'Excelente', dc: 'Não', bw: '1 * taxa', erro: 'Não' },
-            syncQ: 'good', dcQ: 'good', bwQ: 'good', erroQ: 'bad',
+            props: { sync: 'Ruim', dc: 'Sim', bw: '1 * taxa', erro: 'Não' },
+            syncQ: 'bad', dcQ: 'bad', bwQ: 'good', erroQ: 'bad',
             draw(ctx, bits, W, H, bw, hi, lo, mid, tc) {
                 const levels = [hi, mid, lo, mid];
                 let levelIdx = 0;
@@ -357,8 +357,8 @@
         },
         {
             id: '2b1q', name: '2B1Q',
-            props: { sync: 'Parcial', dc: 'Não', bw: '0,5 * taxa', erro: 'Não' },
-            syncQ: 'mid', dcQ: 'good', bwQ: 'good', erroQ: 'bad',
+            props: { sync: 'Ruim', dc: 'Sim', bw: '0,5 * taxa', erro: 'Não' },
+            syncQ: 'bad', dcQ: 'bad', bwQ: 'good', erroQ: 'bad',
             draw(ctx, bits, W, H, bw, hi, lo, mid, tc) {
                 const map = { '00': lo, '01': lo + (hi - lo) / 3, '10': hi, '11': lo + (hi - lo) / 3 * 2 };
                 ctx.beginPath();
@@ -379,8 +379,8 @@
         },
         {
             id: 'cmi', name: 'CMI',
-            props: { sync: 'Parcial', dc: 'Não', bw: '2 * taxa', erro: 'Sim (inversão)' },
-            syncQ: 'mid', dcQ: 'good', bwQ: 'good', erroQ: 'good',
+            props: { sync: 'Excelente', dc: 'Não', bw: '2 * taxa', erro: 'Sim (inversão)' },
+            syncQ: 'good', dcQ: 'good', bwQ: 'good', erroQ: 'good',
             draw(ctx, bits, W, H, bw, hi, lo, mid, tc) {
                 let lastLevel = null;
                 let lastOneLevel = null;
