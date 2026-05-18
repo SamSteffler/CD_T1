@@ -360,14 +360,24 @@
             props: { sync: 'Ruim', dc: 'Sim', bw: '0,5 * taxa', erro: 'Não' },
             syncQ: 'bad', dcQ: 'bad', bwQ: 'good', erroQ: 'bad',
             draw(ctx, bits, W, H, bw, hi, lo, mid, tc) {
-                const map = { '00': lo, '01': lo + (hi - lo) / 3, '10': hi, '11': lo + (hi - lo) / 3 * 2 };
+                let signal = 1; // comeca com polaridade positiva
+                // array de mapeamento de funcoes para funcoes arrow que retornam o sinal apropriado
+                const voltageMap = {
+                    '00': (sig) => sig > 0 ? 1 : -1,
+                    '01': (sig) => sig > 0 ? 3 : -3,
+                    '10': (sig) => sig > 0 ? -1 : 1,
+                    '11': (sig) => sig > 0 ? -3 : 3
+                };
+                const voltageToY = v => mid - (v / 3) * (lo - mid);
                 ctx.beginPath();
                 for (let i = 0; i < bits.length; i += 2) {
                     const pair = bits.slice(i, i + 2).join('').padEnd(2, '0');
-                    const y = map[pair] || lo;
+                    const voltage = voltageMap[pair](signal); // chava funcao arrow com valor signal
+                    const y = voltageToY(voltage);
                     const x = (i / 2) * bw;
                     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                     ctx.lineTo(x + bw, y);
+                    signal = voltage;
                 }
                 ctx.stroke();
                 ctx.setLineDash([3, 3]);
@@ -521,15 +531,24 @@
                 lastLevel = level;
             });
         } else if (schemeId === '2b1q') {
-            // compara niveis par a par usando os niveis reais da codificacao 2B1Q
-            const tensoes = { '00': -3, '01': -1, '10': 3, '11': 1 };
+            // compara niveis par a par usando os niveis reais da codificacao 2B1Q o par anterior
+            // array de mapeamento de funcoes para funcoes arrow que retornam o sinal apropriado
+            let signal = 1; // comeca com polaridade positiva
+            const voltageMap = {
+                '00': (sig) => sig > 0 ? 1 : -1,
+                '01': (sig) => sig > 0 ? 3 : -3,
+                '10': (sig) => sig > 0 ? -1 : 1,
+                '11': (sig) => sig > 0 ? -3 : 3
+            };
             const voltageToY = v => mid - (v / 3) * (lo - mid);
             let lastLevel = null;
             for (let i = 0; i < bits.length; i += 2) {
                 const pair = bits.slice(i, i + 2).join('').padEnd(2, '0');
-                const level = voltageToY(tensoes[pair] ?? -3);
+                const voltage = voltageMap[pair](signal);
+                const level = voltageToY(voltage);
                 if (lastLevel !== null && lastLevel !== level) transicoes++;
                 lastLevel = level;
+                signal = voltage;
             }
         } else if (schemeId === 'cmi') {
             // zero transicao: bit 1 alto depois de um bit zero (ultimo bit 1 = low)
@@ -621,11 +640,20 @@
             bits.forEach(b => { if (b === 1) levelIdx = (levelIdx + 1) % 4; sum += levels[levelIdx]; count++; });
         } else if (schemeId === '2b1q') {
             // diferente pois trabalha com niveis definidos (resposta retornada diferente do resto)
-            const tensoes = { '00': -3, '01': -1, '10': 3, '11': 1 };
+            let signal = 1; // inicializa com sinal positivo
+            // array de mapeamento de funcoes para funcoes arrow que retornam o sinal apropriado
+            const voltageMap = {
+                '00': (sig) => sig > 0 ? 1 : -1,
+                '01': (sig) => sig > 0 ? 3 : -3,
+                '10': (sig) => sig > 0 ? -1 : 1,
+                '11': (sig) => sig > 0 ? -3 : 3
+            };
             for (let i = 0; i < bits.length; i += 2) {
                 const pair = bits.slice(i, i + 2).join('').padEnd(2, '0');
-                sum += tensoes[pair] ?? -3;
+                const voltage = voltageMap[pair](signal);
+                sum += voltage;
                 count++;
+                signal = voltage;
             }
         } else if (schemeId === 'cmi') {
             let currentLevel = lo;
